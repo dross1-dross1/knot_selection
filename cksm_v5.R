@@ -70,7 +70,7 @@ view_knots_r = function(df.knots, df.points, title="Default Title") {
 #### Knot Selection: Entropy Maximization ####
 source("ka_v5_functions.R")
 # knots.entropy = vkr_base(test.data, list(n_neighbors=10, radius_mult=4, max_knots=n.knots, cols_to_sort=c("entropy")))
-vkr.gs = vkr_gs(df.points=test.data, seq.nn=1:20, seq.rm=seq(from=3, to=4.5, by=.25), n.knots=n.knots, cols.to.sort=c("entropy"), gam.k=3)
+vkr.gs = vkr_gs(df.points=test.data, seq.nn=1:10, seq.rm=seq(from=2, to=3, by=.25), n.knots=n.knots, cols.to.sort=c("entropy"), gam.k=3)
 knots.entropy = vkr_base(test.data, vkr.gs$ls.args)
 view_knots_r(knots.entropy, test.data, "Entropy Maximization")
 view_knots(test.data, knots.entropy, "Entropy Maximization")
@@ -165,6 +165,7 @@ gs_entropy = function(seq.nn, seq.rm, n.knots, cols.to.sort=c("entropy")) {
 gs.entropy = gs_entropy(seq.nn=1:5, seq.rm=seq(from=1, to=3, by=.25), 10)
 gs.entropy[order(gs.entropy$mse), ][1, "mse"]
 plot_ly(gs.entropy, x=~nn, y=~rm, z=~mse, color=~mse) %>% add_markers
+ggplot(gs.entropy, aes(x=nn, y=rm)) + geom_tile(aes(fill=mse), colour="black") + scale_fill_gradient(low="blue", high="white")
 
 cd_mse = function(n.knots, n.iter) {
   mses = c()
@@ -187,14 +188,22 @@ auto_mse = function(seq.n.knots) {
     paste0("Currently Doing: n_knots=", i.n.knots) %>% print
     gs.ent = gs_entropy(seq.nn=1:5, seq.rm=seq(from=1, to=3, by=.25), i.n.knots)
     mse.entropy = gs.ent[order(gs.ent$mse), ][1, "mse"]
-    mse.cd = cd_mse(n.knots=i.n.knots, n.iter=10)
-    results = results %>% rbind(data.frame(nk=i.n.knots, entropy=mse.entropy, cd=mse.cd))
+    mse.cd = cd_mse(n.knots=i.n.knots, n.iter=10) %>% mean
+    results = results %>% rbind(data.frame(n_k=i.n.knots, mse_entropy=mse.entropy, mse_cd=mse.cd))
     print(results)
   }
   results
 }
 test.mse = auto_mse(seq(from=10, to=100, by=10))
 test.mse
+
+ggplot(test.mse) + theme_dark() +
+  labs(title="MSE for each knot selection method", subtitle="subtitle", caption="caption") +
+  geom_line(aes(x=n_k, y=mse_entropy, color="mse_entropy"), size=2) + geom_line(aes(x=n_k, y=mse_cd, color="mse_cd"), size=2)
+
+ggplot() + theme_dark() +
+  labs(title="MSE for each knot selection method", subtitle="subtitle", caption="caption") +
+  geom_line(data=gs.entropy, aes(x=nn, y=mse, color=as.factor(rm)), size=2) + geom_line(data=test.mse, aes(x=n_k, y=mse_cd, color="mse_cd"), size=2)
 
 # month = 1:12
 

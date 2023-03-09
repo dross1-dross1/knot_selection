@@ -96,7 +96,7 @@ anti_circle_subset = function(df.points, x0, y0, r) { subset(df.points, euclid_d
 
 # TODO
 subset_spaced = function(df.points, radius.mult) {
-  df.points = df.points[order(df.points$entropy), ]
+  df.points = df.points[order(-df.points$entropy), ]
   new.df = data.frame() %>% rbind(df.points[1, ])  # create new df with starting row of index 1
   while(nrow(df.points) > 0) {
     i = nrow(new.df)
@@ -145,11 +145,13 @@ eval_knots_mse = function(df.points, df.knots, gam.k=3) {
 
 vkr_gs = function(df.points, seq.nn, seq.rm, n.knots, cols.to.sort=c("entropy"), gam.k=3) {
   results = data.frame(nn=integer(), rm=double(), mse=double())
+  dfp.train = df.points %>% sample_frac(.7)
+  dfp.test = df.points %>% anti_join(dfp.train)
   for (nn in seq.nn) {
     for (rm in seq.rm) {
-      knots = vkr_base(df.points, list(n_neighbors=nn, radius_mult=rm, max_knots=n.knots, cols_to_sort=cols.to.sort))
-      # paste0("Currently Doing: knots=", knots %>% nrow, ", nn=", nn, ", rm=", rm) %>% print
-      mse = eval_knots_mse(df.points, knots, gam.k)
+      knots = vkr_base(dfp.train, list(n_neighbors=nn, radius_mult=rm, max_knots=n.knots, cols_to_sort=cols.to.sort))
+      paste0("Currently Doing: knots=", knots %>% nrow, ", nn=", nn, ", rm=", rm) %>% print
+      mse = eval_knots_mse(dfp.test, knots, gam.k)
       results = results %>% rbind(data.frame(nn=nn, rm=rm, mse=mse))
     }
   }
