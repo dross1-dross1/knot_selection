@@ -27,6 +27,8 @@ library(dplyr)    # piping and QoL functions; %>%
 library(scales)   # normalizing lists between 0 and 1; rescale()
 library(stringr)  # manipulating strings
 
+# Knot Evaluation
+source("fuentes_GP_model.R")
 
 # World Generation ------------------------------------------------------------------------------------------------
 
@@ -148,24 +150,26 @@ ggplot(test.data) + geom_abline(slope=1, intercept=0) + theme_dark() +
   geom_point(aes(x=signal, y=all_data_preds, color="all"), alpha=alpha, size=size) +
   geom_point(aes(x=signal, y=cd_knot_preds, color="cd"), alpha=alpha, size=size)
 
-# Grid Search -----------------------------------------------------------------------------------------------------
+# Fuentes Testing -------------------------------------------------------------------------------------------------
+source("fuentes_GP_model.R")
 
-gs_entropy = function(seq.nn, seq.rm, n.knots, cols.to.sort=c("entropy")) {
-  results = data.frame(nn=integer(), rm=double(), mse=double())
-  for (nn in seq.nn) {
-    for (rm in seq.rm) {
-      knots = vkr_base(test.data, list(n_neighbors=nn, radius_mult=rm, max_knots=n.knots, cols_to_sort=cols.to.sort))
-      # paste0("Currently Doing: knots=", knots %>% nrow, ", nn=", nn, ", rm=", rm) %>% print
-      mse = eval_knots_mse(test.data, knots)
-      results = results %>% rbind(data.frame(nn=nn, rm=rm, mse=mse))
-    }
-  }
-  results
-}
-gs.entropy = gs_entropy(seq.nn=1:5, seq.rm=seq(from=1, to=3, by=.25), 10)
-gs.entropy[order(gs.entropy$mse), ][1, "mse"]
-plot_ly(gs.entropy, x=~nn, y=~rm, z=~mse, color=~mse) %>% add_markers
-ggplot(gs.entropy, aes(x=nn, y=rm)) + geom_tile(aes(fill=mse), colour="black") + scale_fill_gradient(low="blue", high="white")
+# Training data with X columns x and y, and y column pm2_5
+td = test.data[c("x", "y", "signal")]
+names(td) = c("x", "y", "pm2_5")
+td.train = td %>% sample_frac(.7)
+td.test = td %>% anti_join(td.train)
+
+td.X.train = td.train[, c("x", "y")]
+td.y.train = td.train[, c("pm2_5")]
+
+td.X.test = td.test[, c("x", "y")]
+td.y.test = td.test[, c("pm2_5")]
+
+# entropy fitting
+params.entropy = fit.fuentes.gp(knots.entropy, td.X.train, td.y.train)
+preds.df.entropy = predict.fuentes.gp(test.knots, td.X.test, params.entropy)
+
+# Automation ------------------------------------------------------------------------------------------------------
 
 cd_mse = function(n.knots, n.iter) {
   mses = c()
@@ -176,25 +180,25 @@ cd_mse = function(n.knots, n.iter) {
   }
   mses
 }
-cd.mse = cd_mse(n.knots=25, n.iter=25)
-cd.mse
-cd.mse %>% mean
 
-# Automation ------------------------------------------------------------------------------------------------------
+# TODO: create train-test split for more accurate MSEs
+# TODO: add random knot selection and Fuentes knot seleciton
+# TODO: use Fuentes model and compare to GAMs
 
 auto_mse = function(seq.n.knots) {
   results = data.frame(nk=integer(), entropy=double(), cd=double())
   for (i.n.knots in seq.n.knots) {
     paste0("Currently Doing: n_knots=", i.n.knots) %>% print
-    gs.ent = gs_entropy(seq.nn=1:5, seq.rm=seq(from=1, to=3, by=.25), i.n.knots)
-    mse.entropy = gs.ent[order(gs.ent$mse), ][1, "mse"]
+    # gs.ent = gs_entropy(seq.nn=1:5, seq.rm=seq(from=1, to=3, by=.25), i.n.knots)
+    gs.ent = vkr_gs(df.points=test.data, seq.nn=1:10, seq.rm=seq(from=2, to=3, by=.25), n.knots=n.knots, cols.to.sort=c("entropy"), gam.k=3)
+    mse.entropy = gs.ent$grid$mse %>% min
     mse.cd = cd_mse(n.knots=i.n.knots, n.iter=10) %>% mean
     results = results %>% rbind(data.frame(n_k=i.n.knots, mse_entropy=mse.entropy, mse_cd=mse.cd))
     print(results)
   }
   results
 }
-test.mse = auto_mse(seq(from=10, to=100, by=10))
+test.mse = auto_mse(seq(from=10, to=20, by=10))
 test.mse
 
 ggplot(test.mse) + theme_dark() +
@@ -205,66 +209,3 @@ ggplot() + theme_dark() +
   labs(title="MSE for each knot selection method", subtitle="subtitle", caption="caption") +
   geom_line(data=gs.entropy, aes(x=nn, y=mse, color=as.factor(rm)), size=2) + geom_line(data=test.mse, aes(x=n_k, y=mse_cd, color="mse_cd"), size=2)
 
-# month = 1:12
-
-# gam_k = 3
-# n.knots = seq(from=5, to=20, by=5)
-
-# gam_k = 4
-# n.knots = seq(from=20, to=40, by=10)
-
-eval_knots_automated = function(seq.month, seq.n.knots, gam.k) {
-  # results = data.frame(month=integer(), n_knots=integer(), all=double(), entropy=double(), random=double(), c_design=double(), tbart=double())
-  results = data.frame()
-  for (i.month in seq.month) {
-    for (i.n.knots in seq.n.knots) {
-      print(paste0("Currently Doing: month=", i.month, ", n_knots=", i.n.knots))
-      # get data
-      df.epa = get_epa(i.month)
-      # k.entropy
-      args.list = list(n_neighbors=10, lambda=0, radius_mult=NA, max_knots=1000, cols_to_sort=c("dist_from_median"))
-      k.entropy = vkr_full(df.epa, args.list, i.n.knots)
-      # k.cover.design
-      k.cover.design = generate_cd_knots(df.epa, i.n.knots)
-      # eval knots
-      df.epa = eval_knots(df.epa, df.epa, "all_data_preds", gam.k)
-      df.epa = eval_knots(df.epa, k.entropy, "entropy_knot_preds", gam.k)
-      df.epa = eval_knots(df.epa, k.cover.design, "cd_knot_preds", gam.k)
-      k.metrics = eval_knots_metrics(df.epa)
-      tkm_results(k.metrics)
-      results = results %>% rbind(data.frame(month=i.month, n_knots=i.n.knots, gam_k=gam.k) %>% cbind(k.metrics))
-    }
-  }
-  results
-}
-
-plot_knot_eval = function(df.k.results, target.month, type="mse") {
-  # digest results: mse (lower better)
-  if (type == "mse") {
-    ggplot(df.k.results %>% filter(month == target.month)) + theme_dark() +
-      labs(title="GAM Model Accuracy (MSE) by Knot Selection Type", subtitle=paste0("Month = ", target.month), caption="caption") +
-      geom_line(aes(x=n_knots, y=all_data_preds_mse, color="all_data_preds_mse"), size=2) +
-      geom_line(aes(x=n_knots, y=entropy_knot_preds_mse, color="entropy_knot_preds_mse"), size=2) +
-      geom_line(aes(x=n_knots, y=cd_knot_preds_mse, color="cd_knot_preds_mse"), size=2)
-  } else if (type == "cor2") {
-  # digest results: cor2 (higher better)
-  ggplot(df.k.results %>% filter(month == target.month)) + theme_dark() +
-    labs(title="GAM Model Accuracy (cor^2) by Knot Selection Type", subtitle=paste0("Month = ", target.month), caption="caption") +
-    geom_line(aes(x=n_knots, y=all_data_preds_cor2, color="all_data_preds_cor2"), size=2) +
-    geom_line(aes(x=n_knots, y=entropy_knot_preds_cor2, color="entropy_knot_preds_cor2"), size=2) +
-    geom_line(aes(x=n_knots, y=cd_knot_preds_cor2, color="cd_knot_preds_cor2"), size=2)
-  } else { print("Invalid knot eval type!") }
-}
-
-# knot.results = eval_knots_automated(seq.month=1:12, seq.n.knots=c(10, 15, 20, 25), gam.k=3)
-# knot.results = eval_knots_automated(seq.month=1:12, seq.n.knots=10:20, gam.k=3)
-knot.results = eval_knots_automated(seq.month=c(2, 5, 6, 10), seq.n.knots=seq(from=10, to=100, by=10), gam.k=3)
-# knot.results = eval_knots_automated(seq.month=c(1, 6, 7, 12), seq.n.knots=c(20, 25, 30), gam.k=4)
-write.csv(knot.results, paste0("kresults_", Sys.time() %>% str_replace_all("[:-]+", ".") %>% str_replace_all("\\s", "_"), "_", nrow(knot.results), "rows", ".csv"), row.names=F)
-knot.results %>% filter(n_knots == 10)
-
-plot_knot_eval(knot.results, target.month=10, type="mse")
-
-# load previous runs
-kr.prev = read.csv("kresults_2023.02.13_08.54.50_132rows.csv")
-for (i in 1:12) { plot_knot_eval(kr.prev, target.month=i, type="mse") %>% print }

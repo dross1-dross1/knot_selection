@@ -150,7 +150,7 @@ vkr_gs = function(df.points, seq.nn, seq.rm, n.knots, cols.to.sort=c("entropy"),
   for (nn in seq.nn) {
     for (rm in seq.rm) {
       knots = vkr_base(dfp.train, list(n_neighbors=nn, radius_mult=rm, max_knots=n.knots, cols_to_sort=cols.to.sort))
-      paste0("Currently Doing: knots=", knots %>% nrow, ", nn=", nn, ", rm=", rm) %>% print
+      # paste0("Currently Doing: knots=", knots %>% nrow, ", nn=", nn, ", rm=", rm) %>% print
       mse = eval_knots_mse(dfp.test, knots, gam.k)
       results = results %>% rbind(data.frame(nn=nn, rm=rm, mse=mse))
     }
