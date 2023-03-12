@@ -2,6 +2,7 @@
 
 # Imports
 library(dplyr)    # piping and QoL functions; %>%
+library(tidyr)    # for dropping NA valuse; drop_na()
 library(scales)   # normalizing lists between 0 and 1; rescale()
 library(mgcv)     # grid search; gam()
 
@@ -15,7 +16,7 @@ library(mgcv)     # grid search; gam()
 #' @param y2 A numeric scalar for the y coordinate of the second point.
 #' @return A numeric scalar.
 #' @example
-#' euclid_dist(3, 4, 0, 0)
+#' euclid_dist_2d(3, 4, 0, 0)
 euclid_dist_2d = function(x1, y1, x2, y2) { sqrt((x1-x2)^2 + (y1-y2)^2) }
 
 #' @title Pad Edges
@@ -44,7 +45,6 @@ ebrahimi_entropy = function(signal) {
   ci[i <= m] = 1 + (i[i <= m] - 1) / m
   ci[i >= n - m + 1] = 1 + (n - i[i >= n - m + 1]) / m
   logs = log(n * differences / (ci * m))
-  # logs = logs %>% replace(logs == -Inf, 0)
   mean(logs)
 }
 
@@ -54,108 +54,88 @@ ebrahimi_entropy = function(signal) {
 
 #' @title Generate Knot Metrics
 #' @description Creates metrics for specific locations from a dataframe with spatial information.
-#' @param df.points A spatial dataframe containing the column `signal`, which is normalized between 0 and 1.
+#' @param df.points A spatial dataframe containing the column `signal`, which contains numeric data.
 #' @param n.neighbors The number of neighbors to consider when calculating metrics for each knot.
-#' @return A dataframe, matching the row count of `df.locations` that gives metrics on `df.points`.
+#' @return A spatial dataframe, including only the columns `x`, `y`, `signal`, along with the metric columns.
 generate_knot_metrics = function(df.points, n.neighbors) {
   metric.df = data.frame(df.points) %>% subset(select=c(x, y, signal))
   for (i in 1:nrow(df.points)) {
     df.points$dist_from_point = euclid_dist_2d(df.points[i, "x"], df.points[i, "y"], df.points$x, df.points$y)
-    df.points.subset = df.points[order(df.points$dist_from_point), ] %>% head(n.neighbors + 1)
-    metric.df[i, "radius"] = df.points.subset$dist_from_point %>% max
-    metric.df[i, "avg_signal"] = df.points.subset$signal %>% mean
-    metric.df[i, "entropy"] = df.points.subset$signal %>% ebrahimi_entropy
+    df.points.subset = df.points[order(df.points$dist_from_point), ] %>% head(n.neighbors + 1)  # subset with only points within radius
+    metric.df[i, "radius"] = df.points.subset$dist_from_point %>% max  # find the radius of the point
+    metric.df[i, "entropy"] = df.points.subset$signal %>% ebrahimi_entropy  # find the entropy of the point
   }
   metric.df
 }
 
-# takes center and applies function to the subset
-modify_metrics = function(df.km, x0, y0, r) {
-
-}
-
-ss_new = function(df.km, radius.mult, max.knots, cols.to.sort) {
-  df.knots = data.frame()
-  for (i.knot in 1:max.knots) {
-    for (i.col in length(cols.to.sort):1) { df.km = df.km[order(-df.km[, c(cols.to.sort[i.col])]), ] }  # sort descending
-    # print(df.km %>% head)
-    # print(view_world(df.km))
-    # update df.km with new signal
-    is.neighbor = euclid_dist_2d(df.km$x, df.km$y, df.km[1, "x"], df.km[1, "y"]) <= df.km[1, "radius"] * radius.mult
-    df.km$signal[is.neighbor] = df.km$signal[is.neighbor] - df.km[1, "avg_signal"] #.5
-    df.km = generate_knot_metrics(df.km, 10)
-    df.knots = df.knots %>% rbind(df.km[1, ])  # append first row to df.knots
-  }
-  df.knots
-}
-
-# test.data %>% generate_knot_metrics(15) %>% ss_new(2, 15, c("entropy")) %>% view_knots_r(test.data, "Testing")
-
-# TODO
+#' @title Anti-Circle Subset
+#' @description Removes all points in a spatial dataframe within the radius of a specified circle.
+#' @param df.points A spatial dataframe.
+#' @param x0 The x coordinate of the circle's center.
+#' @param y0 The y coordinate of the circle's center.
+#' @param r The radius of the circle.
+#' @return A spatial dataframe, including all of the columns from `df.points`.
 anti_circle_subset = function(df.points, x0, y0, r) { subset(df.points, euclid_dist_2d(x0, y0, x, y) > r) }
 
-# TODO
-subset_spaced = function(df.points, radius.mult) {
-  df.points = df.points[order(-df.points$entropy), ]
-  new.df = data.frame() %>% rbind(df.points[1, ])  # create new df with starting row of index 1
-  while(nrow(df.points) > 0) {
-    i = nrow(new.df)
-    df.points = anti_circle_subset(df.points, new.df[i, "x"], new.df[i, "y"], new.df[i, "radius"] * radius.mult)
-    # df.points$signal = df.points$signal - mean(df.points$signal)
-    new.df = rbind(new.df, df.points[1, ])  # append subset
+#' @title Spaced Pruning
+#' @description An iterative way of determining knot candidates in relation to their distance from each other.
+#' @param df.points A spatial dataframe containing the column `entropy`.
+#' @param radius.mult The value to multiply each point's radius by when removing other points from the list of knot candidates.
+#' @param max.knots The maximum number of iterations to pick knots (not guaranteed to always reach the max).
+#' @return The final list of knots.
+spaced_prune = function(df.points, radius.mult, max.knots) {
+  df.knots = data.frame()
+  df.points = df.points[order(df.points$entropy, decreasing=T), ]  # sort df by entropy
+  for(i in 1:max.knots) {
+    df.knots = df.knots %>% rbind(df.points[1, ])  # append knot with highest entropy to list of knots
+    df.points = df.points %>% anti_circle_subset(df.knots[i, "x"], df.knots[i, "y"], df.knots[i, "radius"] * radius.mult)  # remove the points "too close" to the appended knot
   }
-  new.df[-c(nrow(new.df)), ]  # last row is always NA, this removes it
+  df.knots %>% drop_na()
 }
 
-# TODO
-ss_sorted = function(df.points, radius.mult, max.knots, cols.to.sort) {
-  df.points = df.points %>% subset_spaced(radius.mult)
-  for(i in length(cols.to.sort):1) {
-    df.points = df.points[order(-df.points[, c(cols.to.sort[i])]), ]  # select highest entropy
-  }
-  df.points %>% head(max.knots)
-}
-
-# TODO
-#' @title Variable Knot Radius Base with no Argument List
-vkr_base_no_list = function(df.points, n.neighbors, radius.mult, max.knots, cols.to.sort) {
+#' @title Entropy Maximization
+#' @description Given a spatial dataframe with a `signal` column that represents some continuous value, this function will return knots (representative points) based on the other parametrs.
+#' @param df.points A spatial dataframe containing the column `signal`.
+#' @param n.neighbors The number of neighbors to consider when calculating metrics for each knot.
+#' @param radius.mult The value to multiply each point's radius by when removing other points from the list of knot candidates.
+#' @param max.knots The maximum number of iterations to pick knots (not guaranteed to always reach the max).
+#' @return The final list of knots.
+entropy_max = function(df.points, n.neighbors, radius.mult, max.knots) {
   df.metrics = generate_knot_metrics(df.points, n.neighbors)
-  df.metrics %>% ss_sorted(radius.mult, max.knots, cols.to.sort)
+  df.metrics %>% spaced_prune(radius.mult, max.knots)
 }
 
-# TODO
-#' @title Variable Knot Radius Base
-vkr_base = function(df.points, args.list) {
-  vkr_base_no_list(
-    df.points = df.points,
-    n.neighbors = args.list$n_neighbors,
-    radius.mult = args.list$radius_mult,
-    max.knots = args.list$max_knots,
-    cols.to.sort = args.list$cols_to_sort
-  )
-}
+# Functions (Grid Search) -----------------------------------------------------------------------------------------
 
-# VKR Grid Search -------------------------------------------------------------------------------------------------
-
-eval_knots_mse = function(df.points, df.knots, gam.k=3) {
-  gam.eval = gam(signal ~ te(x, y, k=gam.k, bs="gp"),data=df.knots,method="REML", family=gaussian)
+#' @title Evaluate Knots via Mean Squared Error
+#' @description Given a spatial dataframe with a `signal` column and a list of knots, this function will fit a GAM to determine how well the knots represent the data.
+#' @param df.points A spatial dataframe containing the column `signal`, which contains numeric data.
+#' @param df.knots A subset of the spatial dataframe (columns may not match) containing the knots for `df.points`.
+#' @return A scalar; the Mean Squared Error.
+eval_knots_mse = function(df.points, df.knots) {
+  gam.eval = gam(signal ~ te(x, y, k=3, bs="gp"),data=df.knots,method="REML", family=gaussian)
   df.points[, "pkn"] = predict(gam.eval, newdata=df.points)
-  (df.points$signal - df.points[, "pkn"])^2 %>% mean  # mse
+  mean(df.points$signal - df.points[, "pkn"])^2  # mse
 }
 
-vkr_gs = function(df.points, seq.nn, seq.rm, n.knots, cols.to.sort=c("entropy"), gam.k=3) {
-  results = data.frame(nn=integer(), rm=double(), mse=double())
-  dfp.train = df.points %>% sample_frac(.7)
-  dfp.test = df.points %>% anti_join(dfp.train)
+#' @title Entropy Maximization Grid Search
+#' @description Uses grid search cross-validation to select the optimal hyperparameters for the Entropy Maximization algorithm from a list of input ranges.
+#' @param df.points A spatial dataframe containing the column `signal`.
+#' @param seq.nn A sequence of positive integers of the number of neighbors to consider when calculating metrics for each knot.
+#' @param seq.rm A sequence of postive numeric values to multiply each point's radius by when removing other points from the list of knot candidates.
+#' @param max.knots The maximum number of iterations to pick knots (not guaranteed to always reach the max).
+#' @return A list containing the list of best hyperparameters found, the grid search results, and the final list of knots.
+entropy_max_gs = function(df.points, seq.nn, seq.rm, max.knots) {
+  results = data.frame(k_actual=integer(), nn=integer(), rm=double(), mse=double())
   for (nn in seq.nn) {
     for (rm in seq.rm) {
-      knots = vkr_base(dfp.train, list(n_neighbors=nn, radius_mult=rm, max_knots=n.knots, cols_to_sort=cols.to.sort))
-      # paste0("Currently Doing: knots=", knots %>% nrow, ", nn=", nn, ", rm=", rm) %>% print
-      mse = eval_knots_mse(dfp.test, knots, gam.k)
-      results = results %>% rbind(data.frame(nn=nn, rm=rm, mse=mse))
+      knots = entropy_max(df.points, n.neighbors=nn, radius.mult=rm, max.knots=max.knots)
+      mse = eval_knots_mse(df.points, knots)
+      results = results %>% rbind(data.frame(k_actual=nrow(knots), nn=nn, rm=rm, mse=mse))
     }
   }
-  best.mse = results %>% filter(mse == min(mse))
-  best.list.args = list(n_neighbors=best.mse$nn, radius_mult=best.mse$rm, max_knots=n.knots, cols_to_sort=cols.to.sort)
-  list(ls.args=best.list.args, grid=results)
+  best.mse = filter(results, mse == min(mse))[1, ]
+  best.args = list(n_neighbors=best.mse$nn, radius_mult=best.mse$rm)
+  best.knots = entropy_max(df.points, best.args$n_neighbors, best.args$radius_mult, max.knots)
+  list(args=best.args, grid=results, knots=best.knots)
 }
