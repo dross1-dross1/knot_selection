@@ -14,11 +14,11 @@ This repository contains R code for an entropy-based knot selection algorithm. T
 source("ka_v5_functions.R")
 ```
 
-### Function: Entropy Maximization
-
-## Note
+**Note:**
 
 A spatial dataframe, in this context, is a dataframe that contains the columns `x` and `y`.
+
+### Function: Entropy Maximization
 
 **Parameters:**
 - `df.points`: A spatial dataframe containing the column `signal`.
