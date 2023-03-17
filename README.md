@@ -1,6 +1,6 @@
 # Entropy-Based Knot Selection Algorithm
 
-This repository contains R code for an entropy-based knot selection algorithm. The purpose of this algorithm is to select knots from a spatial dataframe containing an additional continuous value column, which allows for faster and more accurate results than other methods that only factor in the spatial part. The algorithm's code is located in the 'ka_v5_functions.R' file and includes two main functions: the base algorithm and the Grid Search method.
+This repository contains R code for an entropy-based knot selection algorithm. The purpose of this algorithm is to select knots from a spatial dataframe containing an additional continuous value column, which allows for faster and more accurate results than other methods that only factor in the spatial part. The algorithm's code is located in the `ka_v5_functions.R` file and includes two main functions: the base algorithm and the Grid Search method.
 
 ## Data
 
