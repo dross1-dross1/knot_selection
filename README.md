@@ -39,14 +39,13 @@ knots.entropy = entropy_max(df.points=test.data, n.neighbors=5, radius.mult=3, m
 **Parameters:**
 - `df.points`: A spatial dataframe containing the column `signal`.
 - `n.neighbors`: The number of neighbors to consider when calculating metrics for each knot.
-- `radius.mult`: The value to multiply each point's radius by when removing other points from the list of knot candidates.
 
 **Return:**
 - A dataframe containing the generated knot metrics.
 
 **Example:**
 ```
-knot.metrics = gkm_parallel(df.points=test.data, n.neighbors=5, radius.mult=3)
+knot.metrics = gkm_parallel(df.points=test.data, n.neighbors=5)
 ```
 
 ## Examples
