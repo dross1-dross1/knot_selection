@@ -20,6 +20,22 @@ library(scales)   # normalizing lists between 0 and 1; rescale()
 #' euclid_dist_3d(3, 4, 5, 0, 0, 0)
 euclid_dist_3d = function(x1, y1, z1, x2, y2, z2) { sqrt((x1-x2)^2 + (y1-y2)^2 + (z1-z2)^2) }
 
+#' @title Is A Point Within A 3D Ellipse
+#' @description Finds out if a given point is within a specified ellipse.
+#' @param x A numeric scalar for the x coordinate of test point.
+#' @param y A numeric scalar for the y coordinate of test point.
+#' @param z A numeric scalar for the z coordinate of test point.
+#' @param x0 A numeric scalar for the x coordinate origin of the ellipse.
+#' @param y0 A numeric scalar for the y coordinate origin of the ellipse.
+#' @param z0 A numeric scalar for the z coordinate origin of the ellipse.
+#' @param rx The
+is_within_ellipse = function(x, y, z, x0, y0, z0, rx, ry, rz, angle) {
+  # rx, ry, rz have to be non-zero
+  ((x - x0)^2 / rx^2) + ((y - y0)^2 / ry^2) + ((z - z0)^2 / rz^2) <= 1
+}
+
+# is_within_ellipse(.4, .4, 0, 0.5, 0.5, 0, 0.3, 0.2, 1, pi/6)
+
 #' @title Pad Edges
 #' @description Repeats the first and last elements of a vector `pad.length` times.
 #' @param vector The target vector to pad.
@@ -30,7 +46,7 @@ euclid_dist_3d = function(x1, y1, z1, x2, y2, z2) { sqrt((x1-x2)^2 + (y1-y2)^2 +
 pad_edges = function(vector, pad.length) {
   first = vector[1]
   last = vector[length(vector)]
-  c(rep(first, each = pad.length), vector, rep(last, each=pad.length))
+  c(rep(first, each=pad.length), vector, rep(last, each=pad.length))
 }
 
 #' @title Ebrahimi Entropy
@@ -112,8 +128,6 @@ gkm_parallel = function(df.points, n.neighbors) {
   metric.df
 }
 
-test = gkm_parallel(test.data, 5)
-
 #' @title Generate Knot Metrics
 #' @description Creates metrics for specific locations from a dataframe with spatial information.
 #' @param df.points A spatial dataframe containing the column `signal`, which contains numeric data.
@@ -129,8 +143,6 @@ generate_knot_metrics = function(df.points, n.neighbors) {
   }
   metric.df
 }
-
-test2 = generate_knot_metrics(test.data, 5)
 
 #' @title Anti-Sphere Subset
 #' @description Removes all points in a spatial dataframe within the radius of a specified sphere.
