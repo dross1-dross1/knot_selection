@@ -36,13 +36,13 @@ euclid_dist_3d = function(x1, y1, z1, x2, y2, z2) { sqrt((x1-x2)^2 + (y1-y2)^2 +
 #' @param pz A numeric scalar for the z coordinate of the test point.
 #' @return A boolean value indicating whether the point is inside the ellipsoid (TRUE) or not (FALSE).
 #' @example
-#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0) # Inside (TRUE)
-#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0) # On surface (TRUE)
-#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 4, 0, 0) # Outside (FALSE)
-#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, 0.5, 0.5, 0.5) # Inside with rotation (TRUE)
-#' is_point_inside_ellipsoid(5, 3, 2, 2, -1, 1, 0, 0, 0, 6, -1, 1) # On surface with translation (TRUE)
-#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, 4, 1, 1) # Outside with rotation (FALSE)
-#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, -1, -3, 1) # Outside with rotation (FALSE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0)  # Inside (TRUE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0)  # On surface (TRUE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 4, 0, 0)  # Outside (FALSE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, 0.5, 0.5, 0.5)  # Inside with rotation (TRUE)
+#' is_point_inside_ellipsoid(5, 3, 2, 2, -1, 1, 0, 0, 0, 6, -1, 1)  # On surface with translation (TRUE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, 4, 1, 1)  # Outside with rotation (FALSE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, -1, -3, 1)  # Outside with rotation (FALSE)
 is_point_inside_ellipsoid = function(a, b, c, x0, y0, z0, alpha, beta, gamma, px, py, pz) {
   # Convert angles from degrees to radians
   alpha = alpha * (pi / 180)
@@ -79,8 +79,27 @@ is_point_inside_ellipsoid = function(a, b, c, x0, y0, z0, alpha, beta, gamma, px
   return(inside)
 }
 
+#' @title Scale a 3D Ellipsoid
+#' @description Scales a specified ellipsoid by a scalar value.
+#' @param a A numeric scalar for the semi-major axis length of the ellipsoid.
+#' @param b A numeric scalar for the semi-intermediate axis length of the ellipsoid.
+#' @param c A numeric scalar for the semi-minor axis length of the ellipsoid.
+#' @param scale_factor A numeric scalar for the scaling factor.
+#' @return A named list containing the scaled ellipsoid semi-axes.
+#' @example
+#' scaled_axes = scale_ellipsoid_axes(3, 2, 1, 2)
+#' print(scaled_axes$a)  # 6
+#' print(scaled_axes$b)  # 4
+#' print(scaled_axes$c)  # 2
+scale_ellipsoid_axes = function(a, b, c, scale_factor) {
+  # Scale the ellipsoid axes
+  a_scaled = a * scale_factor
+  b_scaled = b * scale_factor
+  c_scaled = c * scale_factor
 
-# is_within_ellipse(.4, .4, 0, 0.5, 0.5, 0, 0.3, 0.2, 1, pi/6)
+  # Return the scaled ellipsoid axes as a named list
+  return(list(a = a_scaled, b = b_scaled, c = c_scaled))
+}
 
 #' @title Pad Edges
 #' @description Repeats the first and last elements of a vector `pad.length` times.
