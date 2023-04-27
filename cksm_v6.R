@@ -10,13 +10,12 @@ set.seed(100)                                                               # re
 cat("\014")                                                                 # ctrl+L (clear console output)
 
 # Imports (Graphing)
-library(ggplot2)  # graphing; ggplot() + ...
-library(ggforce)  # graphing circles; geom_circle()
-library(plotly)   # 3d scatter plots; plot_ly()
+library(ggplot2)  # general; ggplot() + ...
+library(ggforce)  # circles; geom_circle()
 
 # Imports
 library(dplyr)    # piping and QoL functions; %>%
-library(scales)   # normalizing lists between 0 and 1; rescale()
+library(scales)   # normalizing vectors between 0 and 1; rescale()
 
 # World Generation ------------------------------------------------------------------------------------------------
 

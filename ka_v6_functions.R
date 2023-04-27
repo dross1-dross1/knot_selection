@@ -20,19 +20,65 @@ library(scales)   # normalizing lists between 0 and 1; rescale()
 #' euclid_dist_3d(3, 4, 5, 0, 0, 0)
 euclid_dist_3d = function(x1, y1, z1, x2, y2, z2) { sqrt((x1-x2)^2 + (y1-y2)^2 + (z1-z2)^2) }
 
-#' @title Is A Point Within A 3D Ellipse
-#' @description Finds out if a given point is within a specified ellipse.
-#' @param x A numeric scalar for the x coordinate of test point.
-#' @param y A numeric scalar for the y coordinate of test point.
-#' @param z A numeric scalar for the z coordinate of test point.
-#' @param x0 A numeric scalar for the x coordinate origin of the ellipse.
-#' @param y0 A numeric scalar for the y coordinate origin of the ellipse.
-#' @param z0 A numeric scalar for the z coordinate origin of the ellipse.
-#' @param rx The
-is_within_ellipse = function(x, y, z, x0, y0, z0, rx, ry, rz, angle) {
-  # rx, ry, rz have to be non-zero
-  ((x - x0)^2 / rx^2) + ((y - y0)^2 / ry^2) + ((z - z0)^2 / rz^2) <= 1
+#' @title Check if a Point is Inside a 3D Ellipsoid
+#' @description Determines if a given point is inside, on the surface, or outside a specified ellipsoid.
+#' @param a A numeric scalar for the semi-major axis length of the ellipsoid.
+#' @param b A numeric scalar for the semi-intermediate axis length of the ellipsoid.
+#' @param c A numeric scalar for the semi-minor axis length of the ellipsoid.
+#' @param x0 A numeric scalar for the x coordinate of the center of the ellipsoid.
+#' @param y0 A numeric scalar for the y coordinate of the center of the ellipsoid.
+#' @param z0 A numeric scalar for the z coordinate of the center of the ellipsoid.
+#' @param alpha A numeric scalar for the rotation angle around the x-axis in degrees.
+#' @param beta A numeric scalar for the rotation angle around the y-axis in degrees.
+#' @param gamma A numeric scalar for the rotation angle around the z-axis in degrees.
+#' @param px A numeric scalar for the x coordinate of the test point.
+#' @param py A numeric scalar for the y coordinate of the test point.
+#' @param pz A numeric scalar for the z coordinate of the test point.
+#' @return A boolean value indicating whether the point is inside the ellipsoid (TRUE) or not (FALSE).
+#' @example
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0) # Inside (TRUE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0) # On surface (TRUE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 0, 0, 0, 4, 0, 0) # Outside (FALSE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, 0.5, 0.5, 0.5) # Inside with rotation (TRUE)
+#' is_point_inside_ellipsoid(5, 3, 2, 2, -1, 1, 0, 0, 0, 6, -1, 1) # On surface with translation (TRUE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, 4, 1, 1) # Outside with rotation (FALSE)
+#' is_point_inside_ellipsoid(3, 2, 1, 0, 0, 0, 30, 45, 60, -1, -3, 1) # Outside with rotation (FALSE)
+is_point_inside_ellipsoid = function(a, b, c, x0, y0, z0, alpha, beta, gamma, px, py, pz) {
+  # Convert angles from degrees to radians
+  alpha = alpha * (pi / 180)
+  beta = beta * (pi / 180)
+  gamma = gamma * (pi / 180)
+
+  # Calculate the rotation matrix
+  R = matrix(
+    c(
+      cos(alpha) * cos(beta),
+      sin(alpha) * cos(beta),
+      -sin(beta),
+      cos(alpha) * sin(beta) * sin(gamma) - sin(alpha) * cos(gamma),
+      sin(alpha) * sin(beta) * sin(gamma) + cos(alpha) * cos(gamma),
+      cos(beta) * sin(gamma),
+      cos(alpha) * sin(beta) * cos(gamma) + sin(alpha) * sin(gamma),
+      sin(alpha) * sin(beta) * cos(gamma) - cos(alpha) * sin(gamma),
+      cos(beta) * cos(gamma)
+    ),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
+
+  # Translate the point
+  pt = c(px - x0, py - y0, pz - z0)
+
+  # Rotate the point
+  pt_rot = solve(R) %*% pt
+
+  # Check if the rotated and translated point is inside the ellipsoid
+  inside = (pt_rot[1]^2 / a^2) + (pt_rot[2]^2 / b^2) + (pt_rot[3]^2 / c^2) <= 1
+
+  return(inside)
 }
+
 
 # is_within_ellipse(.4, .4, 0, 0.5, 0.5, 0, 0.3, 0.2, 1, pi/6)
 
