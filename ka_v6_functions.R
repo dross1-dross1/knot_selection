@@ -135,7 +135,7 @@ ebrahimi_entropy = function(signal) {
   ci[i <= m] = 1 + (i[i <= m] - 1) / m
   ci[i >= n - m + 1] = 1 + (n - i[i >= n - m + 1]) / m
   logs = log(n * differences / (ci * m))
-  mean(logs)
+  return(mean(logs))
 }
 
 # Functions (Base Algorithm) --------------------------------------------------------------------------------------
@@ -146,7 +146,7 @@ ebrahimi_entropy = function(signal) {
 # find n nearest neighbors
 # each iteration should generate the modified row of the old world
 
-#' @title Generate Knot Metrics Parallel
+#' @title Generate Knot Metrics in Parallel
 #' @description Creates metrics for specific locations from a dataframe with spatial information. (In parallel)
 #' @param df.points A spatial dataframe containing the column `signal`, which contains numeric data.
 #' @param n.neighbors The number of neighbors to consider when calculating metrics for each knot.
@@ -190,6 +190,87 @@ gkm_parallel = function(df.points, n.neighbors) {
   metric.df$radius = results[, 1]
   metric.df$entropy = results[, 2]
 
+  metric.df
+}
+
+#' @title Generate Knot Metrics for Ellipsoids in Parallel
+gkm_ellipsoid_parallel = function(df.points) {
+  # Load necessary libraries
+  library(doParallel)
+  library(foreach)
+
+  # Initialize parallel backend
+  n.cores = parallel::detectCores() - 1
+  my.cluster = parallel::makeCluster(n.cores, type="PSOCK")
+  registerDoParallel(my.cluster)
+
+  # Export helper functions to parallel workers
+  parallel::clusterExport(my.cluster, c("is_point_inside_ellipsoid", "ebrahimi_entropy", "pad_edges"))
+
+  # Load required packages within parallel workers
+  parallel::clusterEvalQ(my.cluster, {
+    library(dplyr)
+    library(tidyr)
+    library(scales)
+  })
+
+  # Extract only the relevant columns
+  metric.df = data.frame(df.points) %>% subset(select=c(a, b, c, x0, y0, z0, alpha, beta, gamma, signal))
+
+  # Use foreach and %dopar% to parallelize the loop
+  results = foreach(i=1:nrow(df.points), .combine="rbind", .multicombine=T) %dopar% {
+    point_is_inside = apply(df.points, 1, function(row) {
+      is_point_inside_ellipsoid(
+        a = df.points[i, "a"],
+        b = df.points[i, "b"],
+        c = df.points[i, "c"],
+        x0 = df.points[i, "x0"],
+        y0 = df.points[i, "y0"],
+        z0 = df.points[i, "z0"],
+        alpha = df.points[i, "alpha"],
+        beta = df.points[i, "beta"],
+        gamma = df.points[i, "gamma"],
+        px = row["x0"],
+        py = row["y0"],
+        pz = row["z0"]
+      )
+    })
+    df.points.subset = df.points[point_is_inside, ]  # These are the subset of points inside the ellipsoid
+    entropy = df.points.subset$signal %>% ebrahimi_entropy  # find the entropy of the point
+  }
+
+  # Stop cluster
+  parallel::stopCluster(my.cluster)
+
+  # Add the results to metric.df
+  metric.df$entropy = results[, 1]
+
+  metric.df
+}
+
+#' @title Generate Knot Metrics for Ellipsoids
+gkm_ellipsoid = function(df.points) {
+  metric.df = data.frame(df.points) %>% subset(select=c(a, b, c, x0, y0, z0, alpha, beta, gamma, signal))  # extract only the relavent columns
+  for (i in 1:nrow(df.points)) {
+    point_is_inside = apply(df.points, 1, function(row) {
+      is_point_inside_ellipsoid(
+        a = df.points[i, "a"],
+        b = df.points[i, "b"],
+        c = df.points[i, "c"],
+        x0 = df.points[i, "x0"],
+        y0 = df.points[i, "y0"],
+        z0 = df.points[i, "z0"],
+        alpha = df.points[i, "alpha"],
+        beta = df.points[i, "beta"],
+        gamma = df.points[i, "gamma"],
+        px = row["x0"],
+        py = row["y0"],
+        pz = row["z0"]
+      )
+    })
+    df.points.subset = df.points[point_is_inside, ]  # These are the subset of points inside the ellipsoid
+    metric.df[i, "entropy"] = df.points.subset$signal %>% ebrahimi_entropy  # find the entropy of the point
+  }
   metric.df
 }
 

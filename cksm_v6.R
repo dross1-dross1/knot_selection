@@ -21,7 +21,7 @@ library(scales)   # normalizing vectors between 0 and 1; rescale()
 
 # EPA data
 get_epa = function(month) {
-  epa.data = readRDS("df_data_12list.RDS")[[month]]
+  epa.data = readRDS("data/df_data_12list.RDS")[[month]]
   epa.data = epa.data %>% subset(select = c(x, y, health))
   names(epa.data) = c("x", "y", "signal")
   epa.data$signal = epa.data$signal %>% rescale
@@ -68,3 +68,34 @@ source("ka_v6_functions.R")
 knots.entropy = entropy_max(df.points=test.data, n.neighbors=5, radius.mult=2, max.knots=25)
 view_knots_r(knots.entropy, test.data, "Entropy Maximization")
 view_knots(test.data, knots.entropy, "Entropy Maximization")
+
+# Testing Ellipsoid Code ------------------------------------------------------------------------------------------
+
+generate_test_dataframe = function(N) {
+  # Randomly generate values for each column
+  a = runif(N, min = 1, max = 5)
+  b = runif(N, min = 1, max = 5)
+  c = runif(N, min = 1, max = 5)
+  x0 = runif(N, min = -5, max = 5)
+  y0 = runif(N, min = -5, max = 5)
+  z0 = runif(N, min = -5, max = 5)
+  alpha = runif(N, min = 0, max = 360)
+  beta = runif(N, min = 0, max = 360)
+  gamma = runif(N, min = 0, max = 360)
+  signal = runif(N, min = 0, max = 1)
+
+  # Create a dataframe with the generated values
+  df = data.frame(a, b, c, x0, y0, z0, alpha, beta, gamma, signal)
+
+  return(df)
+}
+
+# Example usage
+N = 100
+test_df = generate_test_dataframe(N)
+
+thingy1 = gkm_ellipsoid_parallel(test_df)
+thingy1 %>% head(15)
+
+thingy2 = gkm_ellipsoid_parallel(test_df)
+thingy2 %>% head(15)
