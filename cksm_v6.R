@@ -64,12 +64,15 @@ n.knots = 25
 
 #### Knot Selection: Entropy Maximization ####
 test.data$z = 1
-source("ka_v6_functions.R")
+source("kaf_v6_sphere.R")
 knots.entropy = entropy_max(df.points=test.data, n.neighbors=5, radius.mult=2, max.knots=25)
 view_knots_r(knots.entropy, test.data, "Entropy Maximization")
 view_knots(test.data, knots.entropy, "Entropy Maximization")
 
 # Testing Ellipsoid Code ------------------------------------------------------------------------------------------
+
+# uncomment this source statement when running the ellipsoid code below
+# source("kaf_v6_ellipsoid.R")
 
 generate_test_dataframe = function(N) {
   # Randomly generate values for each column
@@ -94,7 +97,7 @@ generate_test_dataframe = function(N) {
 N = 100
 test_df = generate_test_dataframe(N)
 
-thingy1 = gkm_ellipsoid_parallel(test_df)
+thingy1 = gkm_ellipsoid(test_df)
 thingy1 %>% head(15)
 
 thingy2 = gkm_ellipsoid_parallel(test_df)
