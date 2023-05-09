@@ -238,4 +238,4 @@ entropy_max = function(df.points, scale.factor, max.knots) {
   return(df.knots %>% drop_na)
 }
 
-entropy_max(df.points = test_df, scale.factor = 1, max.knots = 50)
+# entropy_max(df.points = test_df, scale.factor = 1, max.knots = 50)
