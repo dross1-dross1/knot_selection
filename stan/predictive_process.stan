@@ -111,9 +111,9 @@ model {
 }
 
 generated quantities {
-  array[N_spatial] vector[1] y_spatial_sim;
+  vector[N_spatial] y_spatial_sim;
   for (i in 1:N_spatial) {
-    y_spatial_sim[i] = multi_normal_rng(mu + f, diag_matrix(rep_vector(lambda_y, N_spatial)));
+    y_spatial_sim[i] = normal_rng(mu + f[i], lambda_y);
   }
 
   vector[N_spatial] log_lik;

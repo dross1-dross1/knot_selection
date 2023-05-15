@@ -32,7 +32,7 @@ spectral_components = 5
 
 # Ellipse algo
 max_knots.ellipsoid = 15
-radius_mult.ellipsoid = 0.2
+radius_mult.ellipsoid = 1/25
 
 
 # ------ === Select knots using elliptical neighborhood entropy === ----------
