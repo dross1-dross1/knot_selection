@@ -190,15 +190,14 @@ preds.df$pct_diff_mean = (preds.df$pm2_5 - preds.df$mean_pred) / preds.df$pm2_5
 # Plot the predictions (percent difference using the median, but you can change this)
 ggplot(preds.df) +
   geom_point(data=knots.ellipsoid.df, aes(x=x0, y=y0), shape=23, size=5, fill='black') + # Also plot the knots
-  geom_point(aes(x=x, y=y, fill=pct_diff_median), size=3, pch=21, color='black') +
-  scale_fill_gradient2(low='white', high='red') +
-  coord_fixed()
+  geom_point(aes(x=x, y=y, fill=diff_median), size=3, pch=21, color='black') +
+  scale_fill_gradient2(low='white', high='red')
   
   
 
 # Error metrics ------------------------------------------------
 # Mean squared error
-mse = sum(preds.df$pm2_5 - preds.df$median_pred)**2 / nrow(preds.df)
+mse = sum((preds.df$pm2_5 - preds.df$median_pred)**2) / nrow(preds.df)
 # Mean absolute error
 mae = sum(abs(preds.df$pm2_5 - preds.df$median_pred)) / nrow(preds.df)
 # R^2
@@ -209,7 +208,8 @@ cat(paste0("MSE = ", round(mse, 4), "\nMAE = ", round(mae, 4), "\nR^2 = ", round
 
 # R2 graph
 ggplot(preds.df) +
-  geom_point(aes(x=pm2_5, y=median_pred))
+  geom_point(aes(x=pm2_5, y=median_pred)) +
+  geom_abline(slope=1, intercept=0, color='blue')
 
 
 # LOO ---------------------------------------------------------------------
@@ -220,3 +220,57 @@ ggplot(preds.df) +
 sink("my_file.txt")
 fit.pp$loo()
 sink()
+
+
+# Predictions using "circular" knots --------------------------------------
+# In addition, we need to check if this whole ellipse approach produces better
+# results than just working with your original algorithm (with circles). It would
+# be more efficient to turn the code above into functions and re-run them with
+# different knots. But for the sake of simplicity, I'm just going to copy-paste
+# a few things.
+
+# Re-format the data to use the original (non-elliptical) knots
+data.pp.sphere = list(N_knots=nrow(knots.sphere.df),
+               knot_locs=knots.sphere.df[, c('x', 'y')],
+               N_spatial=nrow(epa.df),
+               spatial_locs=epa.df[, c('x', 'y')],
+               y_spatial=epa.df$pm2_5 %>% as.vector)
+
+# Fit the predictive process model
+fit.pp.sphere = model.pp$sample(data=data.pp.sphere,
+                                 parallel_chains=4,
+                                 iter_warmup=2000,
+                                 max_treedepth=10,
+                                 init=function() list(sigma_z=0.1,
+                                                      ell_z=0.1,
+                                                      sigma_interp=0.1,
+                                                      ell_interp=0.1,
+                                                      lambda_y=0.1))
+
+# Extract the predictions (these are slow to extract, so just be patient)
+pp.sphere.preds = fit.pp.sphere$summary(variables = 'y_spatial_sim')
+
+# Store the locations, true values, and predictions
+preds.sphere.df = epa.df[, c('x', 'y', 'pm2_5')]
+preds.sphere.df$median_pred = pp.sphere.preds$median
+preds.sphere.df$sd_pred = pp.sphere.preds$sd
+
+# Mean squared error
+mse.sphere = sum((preds.sphere.df$pm2_5 - preds.sphere.df$median_pred)**2) / nrow(preds.sphere.df)
+# Mean absolute error
+mae.sphere = sum(abs(preds.sphere.df$pm2_5 - preds.sphere.df$median_pred)) / nrow(preds.sphere.df)
+# R^2
+r2.sphere = cor(preds.sphere.df$pm2_5, preds.sphere.df$median_pred)
+
+# Print output (or sink it to a file). "cat" respects "\n", whereas print does not.
+cat(paste0("MSE = ", round(mse.sphere, 4), "\nMAE = ", round(mae.sphere, 4), "\nR^2 = ", round(r2.sphere, 4)))
+
+# Finally, let's compare predictions between both sets of knots
+preds.df$type = 'elliptical'
+preds.sphere.df$type = 'sphere'
+preds.all.df = rbind(preds.df[, names(preds.sphere.df)], preds.sphere.df)
+
+ggplot(preds.all.df, aes(x=pm2_5, y=median_pred, color=type)) +
+  geom_point() +
+  geom_smooth(method='lm', se=F) +
+  geom_abline(slope=1, intercept=0, color='blue')
