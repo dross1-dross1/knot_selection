@@ -142,7 +142,7 @@ anti_sphere_subset = function(df.points, x0, y0, z0, r) { subset(df.points, eucl
 #' @param radius.mult The value to multiply each point's radius by when removing other points from the list of knot candidates.
 #' @param max.knots The maximum number of iterations to pick knots (not guaranteed to always reach the max).
 #' @return The final list of knots.
-entropy_max = function(df.points, n.neighbors, radius.mult, max.knots) {
+entropy_max.sphere = function(df.points, n.neighbors, radius.mult, max.knots) {
   df.knots = data.frame()
   for(i in 1:max.knots) {
     df.points = generate_knot_metrics(df.points, n.neighbors)  # recompute entropy every iteration

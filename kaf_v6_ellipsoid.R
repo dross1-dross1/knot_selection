@@ -63,6 +63,9 @@ is_point_inside_ellipsoid = function(a, b, c, x0, y0, z0, alpha, beta, gamma, px
   pt_rot = solve(R) %*% pt
 
   # Check if the rotated and translated point is inside the ellipsoid
+  if (c == 0) {
+    c = 1
+  }
   inside = (pt_rot[1]^2 / a^2) + (pt_rot[2]^2 / b^2) + (pt_rot[3]^2 / c^2) <= 1
 
   return(inside)
